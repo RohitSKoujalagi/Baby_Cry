@@ -8,6 +8,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -139,31 +140,36 @@ class RecorderActivity : AppCompatActivity() {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                runOnUiThread { Toast.makeText(this@RecorderActivity, "Server Error: ${e.message}", Toast.LENGTH_SHORT).show() }
+                runOnUiThread { 
+                    Log.e("RecorderActivity", "Network Failure", e)
+                    Toast.makeText(this@RecorderActivity, "Server Error: ${e.message}", Toast.LENGTH_SHORT).show() 
+                }
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    val responseData = response.body?.string()
+                val responseData = response.body?.string()
+                Log.d("RecorderActivity", "Response: $responseData")
+                if (response.isSuccessful && responseData != null) {
                     try {
                         val json = JSONObject(responseData)
-                        val reason = json.optString("prediction", "Unknown")
-                        val confidence = json.getDouble("confidence")
+                        val reason = json.optString("label", json.optString("prediction", "Unknown"))
+                        val confidence = json.optDouble("confidence", 0.0)
                         val remedy = getRemedyForReason(reason)
 
                         runOnUiThread {
                             predictionTextView.text = "Prediction: $reason"
-                            confidenceTextView.text = "Confidence: ${String.format("%.2f", confidence)}%"
+                            confidenceTextView.text = "Confidence: ${String.format("%.2f", confidence * 100)}%"
                             suggestionTextView.text = "Suggestion: $remedy"
                             predictionLayout.visibility = View.VISIBLE
-                            saveToFirestore(reason, remedy, confidence)
+                            saveToFirestore(reason, remedy, confidence * 100)
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("RecorderActivity", "JSON Parsing Error", e)
                     }
                 } else {
                     runOnUiThread {
-                        Toast.makeText(this@RecorderActivity, "Server Error: ${response.code} ${response.message}", Toast.LENGTH_SHORT).show()
+                        Log.e("RecorderActivity", "Server Error: ${response.code}")
+                        Toast.makeText(this@RecorderActivity, "Server Error: ${response.code}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -171,21 +177,32 @@ class RecorderActivity : AppCompatActivity() {
     }
 
     private fun getRemedyForReason(reason: String): String {
-        return when (reason) {
+        return when (reason.lowercase()) {
             "hungry" -> "Baby is likely hungry. Try feeding."
             "discomfort" -> "Baby may be uncomfortable. Check diaper and clothing."
             "tired" -> "Baby might be tired. A nap could help."
             "belly_pain" -> "Baby could have belly pain. Try burping or gentle tummy massage."
+            "burping" -> "Try burping the baby."
             else -> "Baby seems comfortable 😊"
         }
     }
 
     private fun saveToFirestore(reason: String, remedy: String, confidence: Double) {
-        val user = mAuth.currentUser ?: return
+        val user = mAuth.currentUser ?: run {
+            Log.e("RecorderActivity", "User not logged in")
+            return
+        }
         val cryData = CryLog(reason, remedy, Date(), user.uid, confidence)
+        Log.d("RecorderActivity", "Saving Log: $cryData")
         db.collection("cry_logs").add(cryData)
-            .addOnSuccessListener { Toast.makeText(this@RecorderActivity, "Log Saved", Toast.LENGTH_SHORT).show() }
-            .addOnFailureListener { e -> Toast.makeText(this@RecorderActivity, "Failed to save log", Toast.LENGTH_SHORT).show() }
+            .addOnSuccessListener { 
+                Log.d("RecorderActivity", "Log successfully saved to Firestore")
+                Toast.makeText(this@RecorderActivity, "Log Saved", Toast.LENGTH_SHORT).show() 
+            }
+            .addOnFailureListener { e -> 
+                Log.e("RecorderActivity", "Error saving to Firestore", e)
+                Toast.makeText(this@RecorderActivity, "Failed to save log: ${e.message}", Toast.LENGTH_LONG).show() 
+            }
     }
 
     private fun copyWaveFile(pcmFile: File, wavFile: File) {
