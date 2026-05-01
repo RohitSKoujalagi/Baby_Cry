@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "370906739415",
+    "project_id": "baby-cry-app-f9762",
+    "storage_bucket": "baby-cry-app-f9762.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:370906739415:android:d2e90bba23239b28b57692",
+        "android_client_info": {
+          "package_name": "com.example.baby_cry"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKh9I4d74wfbiIxgmosUg4OvrrF2x4Hos"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
